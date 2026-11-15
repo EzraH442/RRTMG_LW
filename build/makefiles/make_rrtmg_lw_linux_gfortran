@@ -1,0 +1,96 @@
+# Makefile for RRTMG_LW - Linux platform (GNU Fortran compiler)
+
+SHELL = /bin/sh
+
+##############################################################
+# Select absorption-coefficient input: dat (embedded) or nc.
+##############################################################
+KGSRC ?= dat
+
+PLATFORM = linux_gfortran
+VERSION = v5.00
+FC = gfortran
+FCOPTS = -O2 -std=legacy -fdefault-real-8 -fdefault-double-8 \
+	-fdefault-integer-8 -fallow-argument-mismatch -fno-align-commons
+FCOPTK = -std=legacy -fdefault-real-8 -fdefault-double-8 \
+	-fdefault-integer-8 -fallow-argument-mismatch -fno-align-commons
+
+ifeq ($(KGSRC),nc)
+NETCDF_FFLAGS ?= $(shell nf-config --fflags 2>/dev/null)
+NETCDF_FLIBS ?= $(shell nf-config --flibs 2>/dev/null)
+ifeq ($(strip $(NETCDF_FLIBS)),)
+$(error KGSRC=nc requires nf-config, or NETCDF_FFLAGS and NETCDF_FLIBS)
+endif
+else ifneq ($(KGSRC),dat)
+$(error KGSRC must be dat or nc)
+endif
+
+OUTPUT = rrtmg_lw_$(VERSION)_$(PLATFORM)
+MPATH = ../modules
+CPATH = ../src
+CPATH_UTL = ../aer_rt_utils
+CDOTO = $(PLATFORM)_$(FC)_dbl.obj
+
+MODULE_NAMES = parkind parrrtm rrlw_cld rrlw_con \
+	rrlw_kg01 rrlw_kg02 rrlw_kg03 rrlw_kg04 rrlw_kg05 rrlw_kg06 \
+	rrlw_kg07 rrlw_kg08 rrlw_kg09 rrlw_kg10 rrlw_kg11 rrlw_kg12 \
+	rrlw_kg13 rrlw_kg14 rrlw_kg15 rrlw_kg16 rrlw_ref rrlw_tbl \
+	rrlw_vsn rrlw_wvn
+SOURCE_NAMES = mcica_random_numbers mcica_subcol_gen_lw.1col \
+	rrtmg_lw_cldprop rrtmg_lw_cldprmc rrtmg_lw_rtrn rrtmg_lw_rtrnmr \
+	rrtmg_lw_rtrnmc rrtmg_lw_setcoef rrtmg_lw_taumol rrtmg_lw_init \
+	rrtmg_lw.1col
+FIXED_NAMES = rrtatm extra
+
+ifeq ($(KGSRC),nc)
+MODULE_NAMES += rrlw_ncpar
+SOURCE_NAMES += rrtmg_lw_read_nc
+else
+SOURCE_NAMES += rrtmg_lw_k_g
+endif
+
+MODULE_OBJECTS = $(addprefix $(CDOTO)/,$(addsuffix .o,$(MODULE_NAMES)))
+SOURCE_OBJECTS = $(addprefix $(CDOTO)/,$(addsuffix .o,$(SOURCE_NAMES)))
+FIXED_OBJECTS = $(addprefix $(CDOTO)/,$(addsuffix .o,$(FIXED_NAMES)))
+UTILITY_OBJECT = $(CDOTO)/util_gfortran.o
+OBJECTS = $(MODULE_OBJECTS) $(SOURCE_OBJECTS) $(FIXED_OBJECTS) $(UTILITY_OBJECT)
+
+.PHONY: all intro conclude clean
+.NOTPARALLEL:
+
+all: intro $(OUTPUT) conclude
+
+$(OUTPUT): $(OBJECTS)
+	$(FC) $(FCOPTS) -I$(CDOTO) -o $@ $(OBJECTS) $(NETCDF_FLIBS)
+
+$(CDOTO)/%.o: $(MPATH)/%.f90 | $(CDOTO)
+	$(FC) $(FCOPTS) $(NETCDF_FFLAGS) -J$(CDOTO) -I$(CDOTO) -c $< -o $@
+
+$(CDOTO)/rrtmg_lw_k_g.o: $(CPATH)/rrtmg_lw_k_g.f90 | $(CDOTO)
+	$(FC) $(FCOPTK) -J$(CDOTO) -I$(CDOTO) -c $< -o $@
+
+$(CDOTO)/%.o: $(CPATH)/%.f90 | $(CDOTO)
+	$(FC) $(FCOPTS) $(NETCDF_FFLAGS) -J$(CDOTO) -I$(CDOTO) -c $< -o $@
+
+$(CDOTO)/%.o: $(CPATH)/%.f | $(CDOTO)
+	$(FC) $(FCOPTS) -J$(CDOTO) -I$(CDOTO) -c $< -o $@
+
+$(UTILITY_OBJECT): $(CPATH_UTL)/util_gfortran.f90 | $(CDOTO)
+	$(FC) $(FCOPTS) -J$(CDOTO) -I$(CDOTO) -c $< -o $@
+
+# Module users must wait until all module files have been generated.
+$(SOURCE_OBJECTS): | $(MODULE_OBJECTS)
+$(FIXED_OBJECTS) $(UTILITY_OBJECT): | $(SOURCE_OBJECTS)
+
+$(CDOTO):
+	mkdir -p $@
+
+intro:
+	@echo "Building $(OUTPUT) with $(FC) ($(KGSRC) coefficients)"
+
+conclude:
+	@echo "Build complete: $(OUTPUT)"
+
+clean:
+	$(RM) $(OUTPUT)
+	$(RM) -r $(CDOTO)
