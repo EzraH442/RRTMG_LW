@@ -446,7 +446,7 @@
 ! Open the output file
       open (iwr,file='OUTPUT_RRTM',form='formatted')
       open (iwrg,file='OUTPUT_GPOINT',form='formatted')
-      write(iwrg,'(a)') '# column gpoint band level pressure_mb upward_W_m-2 downward_W_m-2 net_W_m-2'
+      write(iwrg,'(a)') '# gpoint band level pressure_mb upward_W_m-2 downward_W_m-2 net_W_m-2'
       
 ! This is the main longitude/column loop within rrtmg.
 
@@ -597,11 +597,11 @@
 
             if (istart .eq. 1 .and. iend .eq. 16) then
                if (imca .eq. 0) then
-                  call write_gpoint_flux(iwrg, iplon, nlayers, pz, gptuflux, gptdflux)
+                  call write_gpoint_flux(iwrg, nlayers, pz, gptuflux, gptdflux)
                else
                   gptufluxsum = gptufluxsum + gptuflux
                   gptdfluxsum = gptdfluxsum + gptdflux
-                  if (ims .eq. nmca) call write_gpoint_flux(iwrg, iplon, nlayers, pz, &
+                  if (ims .eq. nmca) call write_gpoint_flux(iwrg, nlayers, pz, &
                        gptufluxsum/nmca, gptdfluxsum/nmca)
                endif
             endif
@@ -780,14 +780,14 @@
       contains
 
 !************************************************************************
-      subroutine write_gpoint_flux(iunit, icol, nlay, pressure, uflux, dflux)
+      subroutine write_gpoint_flux(iunit, nlay, pressure, uflux, dflux)
 !************************************************************************
-      integer(kind=im), intent(in) :: iunit, icol, nlay
+      integer(kind=im), intent(in) :: iunit, nlay
       real(kind=rb), intent(in) :: pressure(0:), uflux(0:,:), dflux(0:,:)
       integer(kind=im) :: igpt
 
       do igpt = 1, ngptlw
-         write(iunit,'(4(i0,1x),4(es16.8,1x))') icol, igpt, ngb(igpt), nlay, &
+         write(iunit,'(3(i0,1x),4(es16.8,1x))') igpt, ngb(igpt), nlay, &
               pressure(nlay), uflux(nlay,igpt), dflux(nlay,igpt), &
               uflux(nlay,igpt)-dflux(nlay,igpt)
       enddo
