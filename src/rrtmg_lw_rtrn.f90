@@ -53,7 +53,8 @@
                       pwvcm, fracs, taut, & 
                       totuflux, totdflux, fnet, htr, &
                       totuclfl, totdclfl, fnetc, htrc, &
-                      idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt )
+                      idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt, &
+                      gptuflux, gptdflux, gptduflux_dt )
 !-----------------------------------------------------------------------------
 !
 !  Original version:   E. J. Mlawer, et al. RRTM_V3.0
@@ -137,6 +138,8 @@
       real(kind=rb), intent(out) :: dtotuclfl_dt(0:)  ! change in upward longwave flux (w/m2/k)
                                                       ! with respect to surface temperature
                                                       !    Dimensions: (0:nlayers)
+      real(kind=rb), intent(out), optional :: gptuflux(0:,:), gptdflux(0:,:)
+      real(kind=rb), intent(out), optional :: gptduflux_dt(0:,:)
 
 ! ----- Local -----
 ! Declarations for radiative transfer
@@ -154,6 +157,8 @@
       real(kind=rb) :: drad(0:nlayers)
       real(kind=rb) :: uclfl(0:nlayers)
       real(kind=rb) :: dclfl(0:nlayers)
+      real(kind=rb) :: urad0(0:nlayers), drad0(0:nlayers)
+      real(kind=rb) :: durad0(0:nlayers)
       real(kind=rb) :: odcld(nlayers,nbndlw)
 
 
@@ -287,6 +292,9 @@
          endif
       enddo
 
+      if (present(gptuflux)) gptuflux = 0.0_rb
+      if (present(gptdflux)) gptdflux = 0.0_rb
+      if (present(gptduflux_dt)) gptduflux_dt = 0.0_rb
       urad(0) = 0.0_rb
       drad(0) = 0.0_rb
       totuflux(0) = 0.0_rb
@@ -352,6 +360,9 @@
  1000    continue
 
 ! Radiative transfer starts here.
+         urad0 = urad
+         drad0 = drad
+         if (idrv .eq. 1) durad0 = d_urad_dt
          radld = 0._rb
          radclrd = 0._rb
          iclddn = 0
@@ -539,6 +550,14 @@
                endif
          enddo
 
+         if (present(gptuflux)) gptuflux(0:nlayers,igc) = &
+              (urad-urad0) * wtdiff * delwave(iband) * fluxfac
+         if (present(gptdflux)) gptdflux(0:nlayers,igc) = &
+              (drad-drad0) * wtdiff * delwave(iband) * fluxfac
+         if (present(gptduflux_dt) .and. idrv .eq. 1) &
+              gptduflux_dt(0:nlayers,igc) = &
+              (d_urad_dt-durad0) * wtdiff * delwave(iband) * fluxfac
+
 ! Increment g-point counter
          igc = igc + 1
 ! Return to continue radiative transfer for all g-channels in present band
@@ -606,4 +625,3 @@
       end subroutine rtrn
 
       end module rrtmg_lw_rtrn
-

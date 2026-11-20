@@ -198,6 +198,7 @@
       integer(kind=im) :: iaer                ! aerosol option flag
       integer(kind=im) :: ird                 ! input unit
       integer(kind=im) :: iwr                 ! output unit
+      integer(kind=im) :: iwrg                ! g-point output unit
       integer(kind=im) :: i                   ! output index
       integer(kind=im) :: ig                  ! g-point index
       integer(kind=im) :: iplon               ! column loop index
@@ -361,6 +362,11 @@
       real(kind=rb) :: dflxsum(0:mxlay)       ! downward longwave flux (w/m2)
       real(kind=rb) :: fnetsum(0:mxlay)       ! net longwave flux (w/m2)
       real(kind=rb) :: htrsum(0:mxlay)        ! longwave heating rate (k/day)
+      real(kind=rb) :: gptuflux(0:mxlay,ngptlw)
+      real(kind=rb) :: gptdflux(0:mxlay,ngptlw)
+      real(kind=rb) :: gptduflux_dt(0:mxlay,ngptlw)
+      real(kind=rb) :: gptufluxsum(0:mxlay,ngptlw)
+      real(kind=rb) :: gptdfluxsum(0:mxlay,ngptlw)
 
 !
 ! Initializations
@@ -398,6 +404,7 @@
       fluxfac = pi * 2.e4_rb                ! orig:   fluxfac = pi * 2.d4  
       ird = 9
       iwr = 10
+      iwrg = 13
       page = char(12)
 
       uflxsum(0:) = 0._rb
@@ -438,6 +445,8 @@
       open (ird,file='INPUT_RRTM',form='formatted')
 ! Open the output file
       open (iwr,file='OUTPUT_RRTM',form='formatted')
+      open (iwrg,file='OUTPUT_GPOINT',form='formatted')
+      write(iwrg,'(a)') '# column gpoint band level pressure_mb upward_W_m-2 downward_W_m-2 net_W_m-2'
       
 ! This is the main longitude/column loop within rrtmg.
 
@@ -458,6 +467,8 @@
 ! Set nmca to sample size for Monte Carlo calculation
          if (imca.eq.0) nmca = 1
          if (imca.eq.1) nmca = 200
+         gptufluxsum = 0._rb
+         gptdfluxsum = 0._rb
 
 ! Return here for multiple band output
  1000    continue
@@ -561,14 +572,16 @@
                             pwvcm, fracs, taut, &
                             totuflux, totdflux, fnet, htr, &
                             totuclfl, totdclfl, fnetc, htrc, &
-                            idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt )
+                            idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt, &
+                            gptuflux, gptdflux, gptduflux_dt )
                else
                   call rtrnmr(nlayers, istart, iend, iout, pz, semiss, ncbands, &
                               cldfrac, taucloud, planklay, planklev, plankbnd, &
                               pwvcm, fracs, taut, &
                               totuflux, totdflux, fnet, htr, &
                               totuclfl, totdclfl, fnetc, htrc, &
-                              idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt )
+                              idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt, &
+                              gptuflux, gptdflux, gptduflux_dt )
                endif
             elseif (imca .eq. 1) then
                call rtrnmc(nlayers, istart, iend, iout, pz, semiss, ncbands, &
@@ -576,7 +589,21 @@
                            pwvcm, fracs, taut, &
                            totuflux, totdflux, fnet, htr, &
                            totuclfl, totdclfl, fnetc, htrc, &
-                           idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt )
+                           idrv, dplankbnd_dt, dtotuflux_dt, dtotuclfl_dt, &
+                           gptuflux, gptdflux, gptduflux_dt )
+            endif
+
+            if (idrv .eq. 1) gptuflux = gptuflux + gptduflux_dt * dtbound
+
+            if (istart .eq. 1 .and. iend .eq. 16) then
+               if (imca .eq. 0) then
+                  call write_gpoint_flux(iwrg, iplon, nlayers, pz, gptuflux, gptdflux)
+               else
+                  gptufluxsum = gptufluxsum + gptuflux
+                  gptdfluxsum = gptdfluxsum + gptdflux
+                  if (ims .eq. nmca) call write_gpoint_flux(iwrg, iplon, nlayers, pz, &
+                       gptufluxsum/nmca, gptdfluxsum/nmca)
+               endif
             endif
 
 ! If requested (idrv=1), adjust upward fluxes and heating rate for the input 
@@ -733,14 +760,15 @@
 
       close(ird)
       close(iwr)
+      close(iwrg)
 
- 9952 format(1x,i3,9x,f7.6,3x,f8.4,6x,f8.4,6x,f12.7,10x,f9.5)
- 9953 format(1x,i3,9x,f6.5,4x,f8.4,6x,f8.4,6x,f12.7,10x,f9.5)
- 9954 format(1x,i3,8x,f6.4,5x,f8.4,6x,f8.4,6x,f12.7,10x,f9.5)
- 9955 format(1x,i3,7x,f6.3,6x,f8.4,6x,f8.4,6x,f12.7,10x,f9.5)
- 9956 format(1x,i3,6x,f6.2,7x,f8.4,6x,f8.4,6x,f12.7,10x,f9.5)
- 9957 format(1x,i3,5x,f6.1,8x,f8.4,6x,f8.4,6x,f12.7,10x,f9.5)
- 9958 format(1x,i3,5x,f6.1,8x,f8.4,6x,f8.4,6x,f12.7,10x,f9.5)
+ 9952 format(1x,i3,9x,f7.6,3x,f8.4,6x,f8.4,6x,f12.7,3x,f16.5)
+ 9953 format(1x,i3,9x,f6.5,4x,f8.4,6x,f8.4,6x,f12.7,3x,f16.5)
+ 9954 format(1x,i3,8x,f6.4,5x,f8.4,6x,f8.4,6x,f12.7,3x,f16.5)
+ 9955 format(1x,i3,7x,f6.3,6x,f8.4,6x,f8.4,6x,f12.7,3x,f16.5)
+ 9956 format(1x,i3,6x,f6.2,7x,f8.4,6x,f8.4,6x,f12.7,3x,f16.5)
+ 9957 format(1x,i3,5x,f6.1,8x,f8.4,6x,f8.4,6x,f12.7,3x,f16.5)
+ 9958 format(1x,i3,5x,f6.1,8x,f8.4,6x,f8.4,6x,f12.7,3x,f16.5)
  9899 format(1x,'Wavenumbers: ',f6.1,' - ',f6.1,' cm-1, ATM ',i6)
  9900 format(1x,'LEVEL    PRESSURE   UPWARD FLUX   DOWNWARD FLUX    NET FLUX       HEATING RATE')
  9901 format(1x,'            mb          W/m2          W/m2           W/m2          degree/day')
@@ -750,6 +778,20 @@
               7(5x,a20,2x,a18,10x,a20,2x,a18,/))
 
       contains
+
+!************************************************************************
+      subroutine write_gpoint_flux(iunit, icol, nlay, pressure, uflux, dflux)
+!************************************************************************
+      integer(kind=im), intent(in) :: iunit, icol, nlay
+      real(kind=rb), intent(in) :: pressure(0:), uflux(0:,:), dflux(0:,:)
+      integer(kind=im) :: igpt
+
+      do igpt = 1, ngptlw
+         write(iunit,'(4(i0,1x),4(es16.8,1x))') icol, igpt, ngb(igpt), nlay, &
+              pressure(nlay), uflux(nlay,igpt), dflux(nlay,igpt), &
+              uflux(nlay,igpt)-dflux(nlay,igpt)
+      enddo
+      end subroutine write_gpoint_flux
 
 !************************************************************************
       subroutine readprof(ird_in, nlayers_out, iout_out, imca, icld_out, &
@@ -1363,4 +1405,3 @@
       end subroutine xsident
 
       end program rrtmg_lw
-
