@@ -56,10 +56,10 @@
 
   Modules and versions used in this calculation:
 
-       rrtmg_lw.1col.f90:  $Revision: 33223 $            rrtmg_lw_init.f90:  $Revision: 33223 $
-     rrtmglw_cldprop.f90:  $Revision: 33223 $          rrtmglw_cldprmc.f90:  NOT USED          
-       rrtmg_lw_rtrn.f90:  NOT USED                    rrtmg_lw_rtrnmr.f90:  $Revision: 33223 $
-     rrtmg_lw_rtrnmc.f90:  NOT USED                    rrtmglw_setcoef.f90:  $Revision: 33223 $
-     rrtmg_lw_taumol.f90:  $Revision: 33223 $                     rrtatm.f:  NOT USED          
+       rrtmg_lw.1col.f90:  $Revision$                    rrtmg_lw_init.f90:  $Revision$        
+     rrtmglw_cldprop.f90:  $Revision$                  rrtmglw_cldprmc.f90:  NOT USED          
+       rrtmg_lw_rtrn.f90:  NOT USED                    rrtmg_lw_rtrnmr.f90:  $Revision$        
+     rrtmg_lw_rtrnmc.f90:  NOT USED                    rrtmglw_setcoef.f90:  $Revision$        
+     rrtmg_lw_taumol.f90:  $Revision$                             rrtatm.f:  NOT USED          
               util_xxx.f:  NOT USED                                extra.f:  NOT USED          
-        rrtmg_lw_k_g.f90:  $Revision: 33223 $
+        rrtmg_lw_k_g.f90:  $Revision$        
